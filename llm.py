@@ -1,6 +1,7 @@
 from langchain_ollama import ChatOllama
 from ollama import Client
 from typing import List, Dict, Optional
+from embedder import Embedding
 
 SYSTEM_PROMPT = """You are an expert internal reference assistant specializing in the American Airlines Customer Service Manual. Your sole purpose is to help the user quickly locate, understand, and apply operational policies, procedures, and guidelines contained within the manual.
 
@@ -31,6 +32,8 @@ SYSTEM_PROMPT = """You are an expert internal reference assistant specializing i
 class LLM:
     client = Client(host="http://localhost:11434/")
     messages = []
+    data_path = "./data/chunks.json"
+
 
     def __init__(self, model: str = "qwen3.5", host: str = "http://localhost:11434/"):
         self.model = model
@@ -41,6 +44,7 @@ class LLM:
         ]
 
         print(f"MODEL HAS BEEN INITIATED: {self.model}")
+    #question = input
 
     def query(self, question: str, context: Optional[str] = None) -> str:
         """Sends a query to the model, optionally formatted with RAG context."""
@@ -49,40 +53,48 @@ class LLM:
         else:
             user_content = question
 
-       
         self.messages.append({"role": "user", "content": user_content})
- 
         response = self.client.chat(model=self.model, messages=self.messages)
         assistant_reply = response.message.content or ""
-
         self.messages.append({"role": "assistant", "content": assistant_reply})
         
         return assistant_reply
+
 
     def clear_history(self) -> None:
         """Resets chat history back to the base system prompt."""
         self.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
 
+    def get_context(self, data_path: str, input: str) -> str:
+        embed = Embedding()
+        embed.embedd_documents("./data/chunks.json")
+        context = embed.extract_similar_data(input)
+
+        return context
 
 
+    def initiate_chat(self):
+        print("Ask me something...\n")
+        while True:
+            _input = input(">>> ")
+            context = self.get_context(self.data_path, _input)
+            response = self.query(_input, context)
+            print(response, '\n')
+          
+            _input2 = input("Anything else?... ")
+            if _input2 == "N" or _input2 == "n":
+                break
+            elif _input2 == "Y" or _input2 == "y":
+                continue
+            else:
+                print("invalid")
+                continue
+
+def main():
+    llm = LLM()
+    llm.initiate_chat()
 
 
-'''ChatResponse(
-model='qwen3.5',
-created_at='2026-09-08T20:45:00.000Z',
-message=Message(
-role='assistant',
-content='The model response text goes here...',
-images=None,
-tool_calls=None
-),
-done=True,
-done_reason='stop',
-total_duration=123456789,      # Nanoseconds
-load_duration=1234567,
-prompt_eval_count=24,          # Input tokens
-prompt_eval_duration=123456,
-eval_count=42,                 # Output tokens generated
-eval_duration=98765432
-)'''
+if __name__ == "__main__":
+    main()
